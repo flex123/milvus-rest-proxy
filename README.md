@@ -154,8 +154,7 @@ Lists all available collections in the Milvus instance.
 **Response**:
 ```json
 {
-    "collections": ["properties", "products", "listings"],
-    "current": "properties"  // Default collection for legacy endpoints
+    "collections": ["properties", "products", "listings"]
 }
 ```
 
@@ -174,24 +173,6 @@ Returns the health status of the proxy and its connection to Milvus.
 }
 ```
 
-### 6. Legacy Endpoints (Backward Compatibility)
-
-These endpoints use the default collection (first available collection) for backward compatibility.
-
-#### Legacy Hybrid Search
-**Endpoint**: `POST /search/hybrid`
-
-Same as `/search/{collection_name}/hybrid` but uses the default collection.
-
-#### Legacy Text Search
-**Endpoint**: `POST /search`
-
-Same as `/search/{collection_name}` but uses the default collection.
-
-#### Legacy Stats
-**Endpoint**: `GET /stats`
-
-Same as `/stats/{collection_name}` but uses the default collection.
 
 ## Query Parameters
 

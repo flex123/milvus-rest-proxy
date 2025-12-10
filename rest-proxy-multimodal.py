@@ -265,8 +265,7 @@ def list_collections():
         from pymilvus import utility
         collections = utility.list_collections()
         return jsonify({
-            'collections': collections,
-            'current': COLLECTION_NAME
+            'collections': collections
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -595,22 +594,6 @@ def get_stats(collection_name):
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Endpoint not found'}), 404
-
-# Backward compatibility endpoints that use default collection
-@app.route('/search/hybrid', methods=['POST'])
-def hybrid_search_default():
-    """Hybrid search with default collection for backward compatibility"""
-    return hybrid_search(COLLECTION_NAME)
-
-@app.route('/search', methods=['POST'])
-def search_default():
-    """Search with default collection for backward compatibility"""
-    return search(COLLECTION_NAME)
-
-@app.route('/stats', methods=['GET'])
-def get_stats_default():
-    """Stats with default collection for backward compatibility"""
-    return get_stats(COLLECTION_NAME)
 
 @app.errorhandler(500)
 def internal_error(error):
