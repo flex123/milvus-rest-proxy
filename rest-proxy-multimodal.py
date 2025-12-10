@@ -117,11 +117,39 @@ def generate_text_to_image_embedding(text: str) -> np.ndarray:
     embedding = clip_model.encode([text])[0]
     return embedding.astype(np.float32)
 
-def choose_ranker(query_text: str, data: Dict[str, Any]):
+def choose_ranker(query_text: str, data: Dict[str, Any], text_weight: float = None, image_weight: float = None):
     """
-    Intelligently choose the ranker based on query type
+    Intelligently choose the ranker based on query type or custom weights
     Visual queries get more weight on image embeddings
+
+    Args:
+        query_text: The search query text
+        data: Request data containing image_url and other parameters
+        text_weight: Custom weight for text embedding (0.0 to 1.0)
+        image_weight: Custom weight for image embedding (0.0 to 1.0)
+
+    Returns:
+        RRFRanker or WeightedRanker instance
     """
+    # If custom weights are provided, use them
+    if text_weight is not None or image_weight is not None:
+        # Calculate missing weight if only one is provided
+        if text_weight is None:
+            text_weight = 1.0 - image_weight
+        if image_weight is None:
+            image_weight = 1.0 - text_weight
+
+        # Validate weights
+        if not (0.0 <= text_weight <= 1.0) or not (0.0 <= image_weight <= 1.0):
+            logger.warning(f"Invalid weights: text_weight={text_weight}, image_weight={image_weight}")
+            # Fall back to default behavior
+            text_weight = 0.7
+            image_weight = 0.3
+
+        logger.info(f"Using custom weights: text={text_weight:.2f}, image={image_weight:.2f}")
+        return WeightedRanker(text_weight, image_weight)
+
+    # Default behavior: intelligent weight selection
     # Visual-specific keywords that should emphasize image similarity
     visual_keywords = [
         'red', 'blue', 'green', 'yellow', 'white', 'black',  # Colors
@@ -265,6 +293,41 @@ def hybrid_search(collection_name):
         filter_expr = convert_filters_to_milvus_expr(raw_filters) if raw_filters else None
         query_type = data.get('query_type', 'hybrid').lower()  # Default to hybrid
 
+        # Extract custom ranker weights
+        text_weight = data.get('text_weight', None)
+        image_weight = data.get('image_weight', None)
+
+        # Validate custom weights if provided
+        if text_weight is not None:
+            try:
+                text_weight = float(text_weight)
+                if text_weight < 0.0 or text_weight > 1.0:
+                    return jsonify({'error': 'text_weight must be between 0.0 and 1.0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'text_weight must be a valid number between 0.0 and 1.0'}), 400
+
+        if image_weight is not None:
+            try:
+                image_weight = float(image_weight)
+                if image_weight < 0.0 or image_weight > 1.0:
+                    return jsonify({'error': 'image_weight must be between 0.0 and 1.0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'image_weight must be a valid number between 0.0 and 1.0'}), 400
+
+        # Check if weights sum to approximately 1.0 when both are provided
+        if text_weight is not None and image_weight is not None:
+            weight_sum = text_weight + image_weight
+            if abs(weight_sum - 1.0) > 0.01:  # Allow small floating point errors
+                logger.warning(f"Weights sum to {weight_sum:.3f}, not 1.0. Normalizing weights.")
+                # Normalize weights
+                if weight_sum > 0:
+                    text_weight = text_weight / weight_sum
+                    image_weight = image_weight / weight_sum
+                else:
+                    # Both weights are effectively 0, use defaults
+                    text_weight = 0.7
+                    image_weight = 0.3
+
         if not query_text and not image_url:
             return jsonify({'error': 'Either text or image_url must be provided'}), 400
 
@@ -368,7 +431,7 @@ def hybrid_search(collection_name):
 
         else:  # query_type == 'hybrid'
             # Hybrid search with intelligent fusion
-            rerank = choose_ranker(query_text, data)
+            rerank = choose_ranker(query_text, data, text_weight, image_weight)
 
             # Log the chosen ranker type for debugging
             if isinstance(rerank, WeightedRanker):

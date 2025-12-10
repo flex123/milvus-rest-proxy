@@ -50,7 +50,11 @@ MILVUS_HOST=in01-xxxxxxxx.aws-us-west-2.vectordb.zilliz.com python3 rest-proxy-m
 
 ## API Endpoints
 
-### Hybrid Search
+### 1. Hybrid Search with Dynamic Collection
+**Endpoint**: `POST /search/{collection_name}/hybrid`
+
+Performs hybrid search using both text and image embeddings with Milvus 2.6.7's native `hybrid_search()` method.
+
 ```bash
 POST /search/{collection_name}/hybrid
 Content-Type: application/json
@@ -60,36 +64,191 @@ Content-Type: application/json
     "limit": 10,
     "filters": {
         "price_max": 500000,
-        "bedrooms_min": 3
-    }
+        "bedrooms_min": 3,
+        "property_type": "house"
+    },
+    "text_weight": 0.7,  // Optional: Custom weight for text (0.0-1.0)
+    "image_weight": 0.3  // Optional: Custom weight for image (0.0-1.0)
 }
 ```
 
-### Text-only Search
+**Response**:
+```json
+{
+    "results": [
+        {
+            "id": "123",
+            "text": "Modern house with swimming pool",
+            "image_url": "https://example.com/image1.jpg",
+            "metadata": {
+                "price": 450000,
+                "bedrooms": 3
+            },
+            "score": 0.95
+        }
+    ],
+    "query_type": "hybrid",
+    "collection": "{collection_name}",
+    "total_results": 1
+}
+```
+
+### 2. Text-only Search with Dynamic Collection
+**Endpoint**: `POST /search/{collection_name}`
+
+Performs text-only search using text embeddings.
+
 ```bash
 POST /search/{collection_name}
 Content-Type: application/json
 
 {
     "text": "kitchen renovation",
-    "limit": 5
+    "limit": 5,
+    "filters": {
+        "price_max": 300000
+    }
 }
 ```
 
-### Collection Stats
-```bash
-GET /stats/{collection_name}
+**Response**:
+```json
+{
+    "results": [...],
+    "query_type": "text",
+    "collection": "{collection_name}",
+    "total_results": 5
+}
 ```
 
-### List Collections
-```bash
-GET /collections
+### 3. Collection Statistics
+**Endpoint**: `GET /stats/{collection_name}`
+
+Returns statistics about a specific collection.
+
+**Response**:
+```json
+{
+    "collection": "{collection_name}",
+    "num_entities": 10000,
+    "index_info": {
+        "text_embedding": {"index_type": "HNSW", "metric_type": "IP"},
+        "image_embedding": {"index_type": "HNSW", "metric_type": "IP"}
+    },
+    "schema": {
+        "fields": [
+            {"name": "id", "type": "int64"},
+            {"name": "text", "type": "varchar"},
+            {"name": "text_embedding", "type": "float_vector", "dim": 512},
+            {"name": "image_embedding", "type": "float_vector", "dim": 512}
+        ]
+    }
+}
 ```
 
-### Health Check
-```bash
-GET /health
+### 4. List All Collections
+**Endpoint**: `GET /collections`
+
+Lists all available collections in the Milvus instance.
+
+**Response**:
+```json
+{
+    "collections": ["properties", "products", "listings"],
+    "current": "properties"  // Default collection for legacy endpoints
+}
 ```
+
+### 5. Health Check
+**Endpoint**: `GET /health`
+
+Returns the health status of the proxy and its connection to Milvus.
+
+**Response**:
+```json
+{
+    "status": "healthy",
+    "milvus_connected": true,
+    "models_loaded": true,
+    "version": "2.6.7"
+}
+```
+
+### 6. Legacy Endpoints (Backward Compatibility)
+
+These endpoints use the default collection (first available collection) for backward compatibility.
+
+#### Legacy Hybrid Search
+**Endpoint**: `POST /search/hybrid`
+
+Same as `/search/{collection_name}/hybrid` but uses the default collection.
+
+#### Legacy Text Search
+**Endpoint**: `POST /search`
+
+Same as `/search/{collection_name}` but uses the default collection.
+
+#### Legacy Stats
+**Endpoint**: `GET /stats`
+
+Same as `/stats/{collection_name}` but uses the default collection.
+
+## Query Parameters
+
+### Common Parameters
+- `text` (string, required): The search query text
+- `limit` (int, optional): Maximum number of results to return (default: 10)
+- `filters` (object, optional): Filter conditions
+
+### Filter Support
+Filters support common fields with these suffixes:
+- `_max`: Maximum value (e.g., `price_max: 500000`)
+- `_min`: Minimum value (e.g., `bedrooms_min: 3`)
+- Direct match for exact values (e.g., `property_type: "house"`)
+
+### Hybrid Search Parameters
+- `text_weight` (float, optional): Custom weight for text embedding (0.0 to 1.0)
+  - If provided with `image_weight`, both will be normalized to sum to 1.0
+  - If only one is provided, the other is calculated as `1.0 - provided_weight`
+  - Example: `text_weight: 0.3` gives `image_weight: 0.7`
+- `image_weight` (float, optional): Custom weight for image embedding (0.0 to 1.0)
+  - Works similarly to `text_weight`
+  - Example: `image_weight: 0.8` gives `text_weight: 0.2`
+
+**Weight Examples**:
+```json
+// Text-dominant search
+{
+    "text": "spacious kitchen",
+    "text_weight": 0.8
+}
+
+// Image-dominant search
+{
+    "text": "red roof",
+    "image_weight": 0.9
+}
+
+// Balanced custom weights
+{
+    "text": "modern house",
+    "text_weight": 0.6,
+    "image_weight": 0.4
+}
+
+// Automatic intelligent weighting (default)
+{
+    "text": "luxury home with pool"
+    // No weights specified - system decides based on query
+}
+```
+
+### Response Format
+All search endpoints return:
+- `results`: Array of search results
+- `query_type`: Type of search performed
+- `collection`: Collection name used
+- `total_results`: Number of results returned
 
 ## Railway Deployment
 
