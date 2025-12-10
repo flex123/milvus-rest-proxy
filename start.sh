@@ -23,7 +23,6 @@ if [ -z "$MILVUS_HOST" ]; then
     echo ""
     echo "Examples:"
     echo "  MILVUS_HOST=localhost"
-    echo "  MILVUS_HOST=grpc-reverse-proxy-production-039b.up.railway.app"
     echo "  MILVUS_HOST=in01-xxxxxxxx.aws-us-west-2.vectordb.zilliz.com"
     exit 1
 fi

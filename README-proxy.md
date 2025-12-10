@@ -15,15 +15,18 @@ A production-grade REST API for Milvus 2.6.7 supporting native hybrid search wit
 
 ### Required Environment Variable
 
-The proxy requires `MILVUS_HOST` to be set:
+The proxy requires `MILVUS_HOST` to be set. Without it, the application will exit with an error.
 
 ```bash
-# Option 1: Environment variable
+# Option 1: Environment variable (for local development)
 export MILVUS_HOST=your-milvus-host
 python3 rest-proxy-multimodal.py
 
-# Option 2: Inline
+# Option 2: Inline (for local development)
 MILVUS_HOST=your-milvus-host python3 rest-proxy-multimodal.py
+
+# Option 3: Railway deployment (set in Variables tab)
+# MILVUS_HOST=your-milvus-host
 ```
 
 ### Optional Environment Variables
@@ -42,7 +45,7 @@ MILVUS_HOST=localhost MILVUS_PORT=19530 python3 rest-proxy-multimodal.py
 MILVUS_HOST=in01-xxxxxxxx.aws-us-west-2.vectordb.zilliz.com python3 rest-proxy-multimodal.py
 
 # Railway Deployment
-# Set MILVUS_HOST in Railway Variables tab
+# Set MILVUS_HOST in Railway Variables tab, not in start command
 ```
 
 ## API Endpoints
@@ -90,17 +93,47 @@ GET /health
 
 ## Railway Deployment
 
-1. **Set Environment Variables** in Railway dashboard:
-   ```
-   MILVUS_HOST=your-milvus-host
-   ```
+### Prerequisites
+- GitHub repository with the proxy code
+- Railway account
 
-2. **OR use Custom Start Command**:
-   ```
-   MILVUS_HOST=your-milvus-host python3 rest-proxy-multimodal.py
-   ```
+### Deployment Steps
 
-3. **Deploy** - Railway will automatically build and deploy
+1. **Create New Railway Project**:
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your `milvus-rest-proxy-multimodal` repository
+
+2. **Configure Environment Variables** (Required):
+   - Go to your service → Settings → Variables tab
+   - Add: `MILVUS_HOST=your-actual-milvus-host`
+   - Optional: `MILVUS_PORT=443` (default)
+
+   **Examples**:
+   - Local: `MILVUS_HOST=localhost`
+   - Milvus Cloud: `MILVUS_HOST=in01-xxxxxxxx.aws-us-west-2.vectordb.zilliz.com`
+
+3. **Deployment Configuration**:
+   - Railway automatically detects the configuration from `railway.toml`
+   - Health check path: `/health`
+   - Port: 8080
+   - Uses NIXPACKS builder
+
+4. **Monitoring**:
+   - Check deployment logs in Railway dashboard
+   - Health checks run every 5 minutes
+   - Service restarts on failure (up to 10 retries)
+
+### Troubleshooting
+If deployment fails:
+1. Check that `MILVUS_HOST` is set in Railway Variables tab
+2. Verify the Milvus instance is accessible from Railway
+3. Check deployment logs for detailed error messages
+
+### Alternative: Custom Start Command
+Instead of using Variables, you can set the start command in Railway:
+```
+MILVUS_HOST=your-milvus-host bash start.sh
+```
 
 ## How It Works
 
